@@ -1,3 +1,579 @@
-trò chơi sắc màu vật lí
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phiếu học tập: Ma trận sắc màu 8/3</title>
+    <style>
+        /* === RESET & CƠ BẢN === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* === BỐ CỤC CHÍNH (TỈ LỆ 16:9) === */
+        #app-container {
+            width: 100vw;
+            height: 56.25vw; /* Tỉ lệ 16:9 */
+            max-height: 100vh;
+            max-width: 177.78vh;
+            background-color: #ffffff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            display: flex;
+            position: relative;
+        }
+
+        /* NỬA TRÁI: BẢNG MA TRẬN */
+        #left-pane {
+            width: 50%;
+            height: 100%;
+            padding: 1.5% 2%;
+            border-right: 2px dashed #ccc;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .print-header {
+            margin-bottom: 15px;
+        }
+        .print-header h3 {
+            text-align: center;
+            color: #d81b60;
+            margin-bottom: 10px;
+            font-size: 1.5vw;
+            text-transform: uppercase;
+        }
+        .print-header p {
+            font-size: 1vw;
+            line-height: 1.8;
+            color: #333;
+            font-weight: 500;
+        }
+
+        #matrix-container {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(30, 1fr);
+            gap: 1px;
+            background-color: #eee;
+            border: 2px solid #333;
+            padding: 2px;
+            border-radius: 5px;
+        }
+
+        .matrix-cell {
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8vw;
+            font-weight: bold;
+            color: #ccc; /* Màu chữ mặc định mờ */
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        /* NỬA PHẢI: CÂU HỎI TRẮC NGHIỆM */
+        #right-pane {
+            width: 50%;
+            height: 100%;
+            padding: 1.5% 2%;
+            display: flex;
+            flex-direction: column;
+            background-color: #fafafa;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 0.8vw 1vw;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9vw;
+            transition: background-color 0.2s;
+            color: white;
+        }
+        .btn-check { background-color: #1976d2; }
+        .btn-check:hover { background-color: #1565c0; }
+        .btn-retry-wrong { background-color: #f57c00; }
+        .btn-retry-wrong:hover { background-color: #ef6c00; }
+        .btn-retry-all { background-color: #d32f2f; }
+        .btn-retry-all:hover { background-color: #c62828; }
+        .btn-pdf { background-color: #388e3c; }
+        .btn-pdf:hover { background-color: #2e7d32; }
+
+        #questions-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        /* Tùy chỉnh thanh cuộn */
+        #questions-container::-webkit-scrollbar { width: 6px; }
+        #questions-container::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
+
+        .question-block {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid #1976d2;
+        }
+
+        .question-text {
+            font-size: 1vw;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #222;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .option-btn {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            padding: 6px 10px;
+            border-radius: 4px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.95vw;
+            color: #0d47a1;
+            transition: all 0.2s;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background-color: #bbdefb;
+        }
+
+        .option-btn.correct {
+            background-color: #4caf50 !important;
+            color: white !important;
+            border-color: #388e3c !important;
+            font-weight: bold;
+        }
+
+        .option-btn.wrong {
+            background-color: #f44336 !important;
+            color: white !important;
+            border-color: #d32f2f !important;
+        }
+
+        /* BẢNG THÔNG ĐIỆP ẨN */
+        #message-board {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            z-index: 100;
+            border: 3px solid #d81b60;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #message-board h1 {
+            color: #d81b60;
+            font-size: 2.5vw;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .close-msg {
+            margin-top: 15px;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1vw;
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* === CSS RIÊNG KHI XUẤT FILE PDF TRÊN A4 NGANG === */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 5mm;
+            }
+            body {
+                background: none;
+                display: block;
+                height: auto;
+                overflow: visible;
+            }
+            #app-container {
+                width: 100%;
+                height: 100%;
+                max-width: none;
+                max-height: none;
+                box-shadow: none;
+                display: flex;
+            }
+            #controls, #message-board {
+                display: none !important;
+            }
+            #left-pane, #right-pane {
+                height: 100%;
+                padding: 10px;
+            }
+            #left-pane { border-right: 1px solid #000; }
+            
+            /* Điều chỉnh Font chữ và Kích thước để ép vừa 1 trang A4 */
+            .print-header h3 { font-size: 16px; margin-bottom: 5px; }
+            .print-header p { font-size: 12px; margin-bottom: 3px; }
+            
+            #matrix-container { gap: 0px; border: 1px solid #000; padding: 0; }
+            .matrix-cell { font-size: 9px; padding: 1px; color: #aaa; border: 0.1px solid #eee; }
+            
+            #questions-container {
+                overflow: visible !important;
+                padding: 0;
+            }
+            .question-block {
+                margin-bottom: 4px;
+                padding: 4px 6px;
+                border-left: 3px solid #000;
+                box-shadow: none;
+                border-bottom: 1px dashed #ccc;
+            }
+            .question-text {
+                font-size: 10.5px;
+                margin-bottom: 3px;
+                line-height: 1.2;
+            }
+            .options-grid {
+                gap: 2px;
+            }
+            .option-btn {
+                font-size: 10px;
+                padding: 2px 4px;
+                border: 1px solid #ccc;
+                background: transparent;
+                color: #000;
+            }
+            
+            /* Ép trình duyệt in cả màu nền (nếu học sinh đã làm xong và muốn in kết quả) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="left-pane">
+        <div class="print-header">
+            <h3>Phiếu học tập MA TRẬN SẮC MÀU</h3>
+            <p>Họ và tên học sinh:...................................................................</p>
+            <p>Lớp: ............................................................................................</p>
+            <p>Ngày ........... tháng ................ năm ...................</p>
+        </div>
+        <div id="matrix-container"></div>
+    </div>
+
+    <div id="right-pane">
+        <div id="controls">
+            <button class="btn btn-check" id="btn-check">Kiểm tra thông điệp</button>
+            <button class="btn btn-retry-wrong" id="btn-retry-wrong">Làm lại câu sai</button>
+            <button class="btn btn-retry-all" id="btn-retry-all">Làm lại tất cả</button>
+            <button class="btn btn-pdf" id="btn-pdf">Xuất file PDF</button>
+        </div>
+        <div id="questions-container"></div>
+    </div>
+
+    <div id="message-board">
+        <h1>CHÚC MỪNG NGÀY QUỐC TẾ PHỤ NỮ 08 - 03</h1>
+        <p>Chúc một nửa thế giới luôn xinh đẹp, hạnh phúc và thành công!</p>
+        <button class="close-msg" id="btn-close-msg">Đóng</button>
+    </div>
+</div>
+
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+    // 1. TẠO ÂM THANH
+    const dungAudio = new Audio('dung.mp3');
+    const saiAudio = new Audio('sai.mp3');
+
+    // 2. DỮ LIỆU MA TRẬN KÝ TỰ (22 hàng x 30 cột)
+    const rawMatrixStr = `
+E Y X A L K K Z A Y E A V Y W D X X Y K K V W X V K A E A V
+D K I W L S X S S Z A D C' C' C' K H F H Y Ư Y Ư F C' C' C' X A I
+V Y D C C L E W F W K A C' X E K H L H K Ư D Ư I C' F Z F F K
+E L C C C C W E Z V A K C' I D L H H H K Ư F Ư S C' K X S F D
+L C C C C C C E I D E I C' L Z K H V H L Ư W Ư W C' F K Z V I
+Y C C H H C C S E D W Y C' C' C' I H L H X Ư Ư Ư E C' C' C' S E F
+Y C C H H C C A L V S Z V Y E L E V W K Z F S Z V S V X W F
+I C C C C C C X K W Y Y M I M S Ư S Ư Z N I N Z G G G D K V
+S A C C C C D E E F I V M M M K Ư F Ư W N K N K G Y A E X K
+Y X F C C K L E I K V Z M W M I Ư S Ư S N N N Y G D G D D I
+A X E U U Y X D A F S Y M K M V Ư Z Ư Z N I N Y G S G Y X E
+V X Y U U Z D I I K D X M D M D Ư Ư Ư I N D N A G G G A I Z
+K L K U U A V X A F X X W I V V Z X V Y Z Y W Y E K D Y W K
+W U U U U D E W W V 0 0 0 E 8 8 8 L D Z E E 0 0 0 S 3 3 3 W
+U U U U U V L Z F Y 0 F 0 Z 8 V 8 L W S E V 0 E 0 L E Y 3 L
+Y U U U U U U W K A 0 K 0 E 8 8 8 L J J J D 0 X 0 F 3 3 3 L
+Z A I U U U U U Y Y 0 Z 0 X 8 W 8 Z D Z X L 0 S 0 F K E 3 E
+Y F S U U U U Z K Z 0 0 0 D 8 8 8 F S D S E 0 0 0 L 3 3 3 Y
+D X I U U I F L S K K X E K D F L Y S L F E V D E V F X Y L
+Z W L U U W D F A S F D W V Y D W K L X A D X V S V E A A A
+E K F U U E F W F E Y A L V L E D F D A L V Z K D E D E A Z
+W W L D V X L L K D S W W E F I I I E K V I S S A Z E Y L V
+`;
+    // Parse matrix
+    const matrixGrid = rawMatrixStr.trim().split('\n').map(row => row.trim().split(/\s+/));
+
+    // 3. DỮ LIỆU CÂU HỎI VÀ ĐÁP ÁN (12 câu)
+    const questionsData = [
+        {
+            q: "Câu 1: Trong hệ đo lường quốc tế SI, đơn vị của điện thế là gì?",
+            opts: [{id: "A", text: "A. Culông (C)"}, {id: "B", text: "B. Vôn trên mét (V/m)"}, {id: "C", text: "C. Vôn (V)"}, {id: "D", text: "D. Fara (F)"}],
+            correct: "C", colorTarget: "C", colorCode: "#FF0000" // ĐỎ
+        },
+        {
+            q: "Câu 2: Khi thả một electron (không vận tốc ban đầu) vào trong một điện trường tĩnh, dưới tác dụng của lực điện, electron sẽ có xu hướng chuyển động như thế nào?",
+            opts: [{id: "E", text: "E. Đứng yên tại chỗ"}, {id: "F", text: "F. Di chuyển theo quỹ đạo tròn"}, {id: "G", text: "G. Di chuyển từ nơi có điện thế cao xuống nơi có điện thế thấp"}, {id: "H", text: "H. Di chuyển từ nơi có điện thế thấp lên nơi có điện thế cao"}],
+            correct: "H", colorTarget: "H", colorCode: "#FFFF00" // VÀNG
+        },
+        {
+            q: "Câu 3: Trong các nhận định dưới đây về điện thế, nhận định nào sai?",
+            opts: [{id: "X", text: "X. Đơn vị của điện thế là Vôn (V)."}, {id: "Y", text: "Y. Điện thế tại M đặc trưng cho khả năng tạo ra thế năng."}, {id: "Z", text: "Z. Được xác định bằng thương số công của lực điện và điện tích."}, {id: "U", text: "U. Điện thế tại một điểm trong điện trường là đại lượng véc-tơ."}],
+            correct: "U", colorTarget: "U", colorCode: "#4CAF50" // XANH LÁ
+        },
+        {
+            q: "Câu 4: Trong điện trường đều, gọi V<sub>M</sub> và V<sub>N</sub> lần lượt là điện thế tại điểm M và điểm N. Hiệu điện thế U<sub>MN</sub> giữa hai điểm M và N được xác định bởi công thức nào sau đây?",
+            opts: [{id: "A'", text: "A'. U<sub>MN</sub> = V<sub>N</sub> - V<sub>M</sub>"}, {id: "B'", text: "B'. U<sub>MN</sub> = V<sub>M</sub> + V<sub>N</sub>"}, {id: "C'", text: "C'. U<sub>MN</sub> = V<sub>M</sub> - V<sub>N</sub>"}, {id: "D'", text: "D'. U<sub>MN</sub> = V<sub>N</sub> / V<sub>M</sub>"}],
+            correct: "C'", colorTarget: "C'", colorCode: "#FFB6C1" // HỒNG NHẠT
+        },
+        {
+            q: "Câu 5: Trong thực tế tính toán hoặc đo đạc điện thế, người ta thường quy ước chọn mốc điện thế (V = 0) ở đâu?",
+            opts: [{id: "J", text: "J. Ở một điểm bất kỳ cách mặt đất 1 m"}, {id: "K", text: "K. Ở vật cách mặt đất 10 m"}, {id: "L", text: "L. Ở vô cực"}, {id: "M", text: "M. Ở mặt đất"}],
+            correct: "M", colorTarget: "M", colorCode: "#424242" // XÁM ĐEN
+        },
+        {
+            q: "Câu 6: Trong điện trường đều có cường độ E, hai điểm A và B nằm trên cùng một đường sức, khoảng cách từ A đến B theo chiều của E là d. Hiệu điện thế U<sub>AB</sub> được tính bằng biểu thức nào?",
+            opts: [{id: "A", text: "A. U<sub>AB</sub> = E / d"}, {id: "Â", text: "Â. U<sub>AB</sub> = d / E"}, {id: "U", text: "U. U<sub>AB</sub> = -E.d"}, {id: "Ư", text: "Ư. U<sub>AB</sub> = E.d"}],
+            correct: "Ư", colorTarget: "Ư", colorCode: "#FF8C00" // CAM ĐẬM
+        },
+        {
+            q: "Câu 7: Một electron có điện tích -e (e > 0) ban đầu đứng yên, được tăng tốc bởi một hiệu điện thế U. Bỏ qua mọi lực cản. Độ biến thiên động năng của electron có độ lớn bằng:",
+            opts: [{id: "K", text: "K. -e.U"}, {id: "L", text: "L. e / U"}, {id: "M", text: "M. U / e"}, {id: "N", text: "N. e.U"}],
+            correct: "N", colorTarget: "N", colorCode: "#800080" // TÍM ĐẬM
+        },
+        {
+            q: "Câu 8: Chọn phát biểu sai về điện trường đều giữa hai bản kim loại phẳng, song song, tích điện trái dấu:",
+            opts: [{id: "D", text: "D. Các đường sức điện là những đường thẳng song song cách đều."}, {id: "E", text: "E. Cường độ điện trường có độ lớn như nhau tại mọi điểm."}, {id: "F", text: "F. Các đường sức điện có chiều đi từ bản dương sang bản âm."}, {id: "G", text: "G. Cường độ điện trường tỉ lệ nghịch với hiệu điện thế."}],
+            correct: "G", colorTarget: "G", colorCode: "#800080" // TÍM ĐẬM
+        },
+        {
+            q: "Câu 9: Hiệu điện thế U<sub>MN</sub> giữa hai điểm M và N trong điện trường là đại lượng đặc trưng cho khả năng sinh công của điện trường khi di chuyển điện tích từ đâu đến đâu?",
+            opts: [{id: "G", text: "G. Từ M ra vô cực"}, {id: "H", text: "H. Từ N ra vô cực"}, {id: "I", text: "I. Từ N đến M"}, {id: "J", text: "J. Từ M đến N"}],
+            correct: "J", colorTarget: "J", colorCode: "#0000FF" // XANH DƯƠNG
+        },
+        {
+            q: "Câu 10: Hai bản kim loại phẳng song song cách nhau d = 10 cm, giữa hai bản là điện trường đều. Đặt vào hai bản U = 20 V. Cường độ điện trường E có độ lớn bằng:",
+            opts: [{id: "0", text: "0. 200 V/m"}, {id: "1", text: "1. 2000 V/m"}, {id: "2", text: "2. 2 V/m"}, {id: "3", text: "3. 0,5 V/m"}],
+            correct: "0", colorTarget: "0", colorCode: "#E91E63" // HỒNG ĐẬM
+        },
+        {
+            q: "Câu 11: Xét hai điểm M, N trong điện trường. Nếu điện thế tại M là V<sub>M</sub> = 12 V và V<sub>N</sub> = 4 V, thì hiệu điện thế U<sub>MN</sub> bằng bao nhiêu?",
+            opts: [{id: "5", text: "5. 16 V"}, {id: "6", text: "6. -8 V"}, {id: "7", text: "7. 3 V"}, {id: "8", text: "8. 8 V"}],
+            correct: "8", colorTarget: "8", colorCode: "#E91E63" // HỒNG ĐẬM
+        },
+        {
+            q: "Câu 12: Tam giác vuông ABC tại C trong điện trường đều E // AC, hướng từ A đến C, E = 500 V/m. AC = 6 cm = 0,06 m. U<sub>AC</sub> là:",
+            opts: [{id: "1", text: "1. 300 V"}, {id: "2", text: "2. -30 V"}, {id: "3", text: "3. 30 V"}, {id: "4", text: "4. 0,3 V"}],
+            correct: "3", colorTarget: "3", colorCode: "#E91E63" // HỒNG ĐẬM
+        }
+    ];
+
+    // TRẠNG THÁI HỆ THỐNG
+    const state = {
+        solved: Array(12).fill(false)
+    };
+
+    // 4. RENDER MA TRẬN
+    const matrixContainer = document.getElementById('matrix-container');
+    const cellElements = []; // Lưu reference để tô màu
+    
+    matrixGrid.forEach(row => {
+        row.forEach(char => {
+            const div = document.createElement('div');
+            div.className = 'matrix-cell';
+            div.textContent = char;
+            div.dataset.char = char; // Lưu ký tự để filter an toàn
+            matrixContainer.appendChild(div);
+            cellElements.push(div);
+        });
+    });
+
+    // 5. RENDER CÂU HỎI (Bảo mật tuyệt đối, không dùng onclick chuỗi)
+    const questionsContainer = document.getElementById('questions-container');
+    const optionButtonsMap = []; // Lưu lại btn để Reset
+
+    questionsData.forEach((qItem, qIndex) => {
+        const qBlock = document.createElement('div');
+        qBlock.className = 'question-block';
+        
+        const qTitle = document.createElement('div');
+        qTitle.className = 'question-text';
+        qTitle.innerHTML = qItem.q; // An toàn vì data cứng
+        qBlock.appendChild(qTitle);
+
+        const optionsGrid = document.createElement('div');
+        optionsGrid.className = 'options-grid';
+        
+        const currentQButtons = [];
+
+        qItem.opts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerHTML = opt.text;
+            
+            // Gắn sự kiện qua addEventListener (chuẩn)
+            btn.addEventListener('click', function() {
+                handleAnswer(qIndex, opt.id, btn, currentQButtons);
+            });
+            
+            optionsGrid.appendChild(btn);
+            currentQButtons.push(btn);
+        });
+
+        optionButtonsMap.push(currentQButtons);
+        qBlock.appendChild(optionsGrid);
+        questionsContainer.appendChild(qBlock);
+    });
+
+    // 6. XỬ LÝ LÔ-GÍC CHỌN ĐÁP ÁN
+    function handleAnswer(qIndex, selectedId, btnElement, allButtonsInQ) {
+        if (state.solved[qIndex]) return; // Đã trả lời đúng thì bỏ qua
+
+        const qItem = questionsData[qIndex];
+        
+        if (selectedId === qItem.correct) {
+            // Đúng
+            dungAudio.currentTime = 0;
+            dungAudio.play().catch(e=>console.log(e));
+            
+            btnElement.classList.remove('wrong');
+            btnElement.classList.add('correct');
+            state.solved[qIndex] = true;
+            
+            // Tô màu ma trận
+            colorMatrix(qItem.colorTarget, qItem.colorCode);
+            
+            // Khóa các nút khác
+            allButtonsInQ.forEach(b => {
+                if (b !== btnElement) b.disabled = true;
+            });
+
+            checkWin();
+        } else {
+            // Sai
+            saiAudio.currentTime = 0;
+            saiAudio.play().catch(e=>console.log(e));
+            btnElement.classList.add('wrong');
+        }
+    }
+
+    function colorMatrix(targetChar, color) {
+        cellElements.forEach(cell => {
+            if (cell.dataset.char === targetChar) {
+                cell.style.backgroundColor = color;
+                cell.style.color = '#fff';
+            }
+        });
+    }
+
+    function checkWin() {
+        const allSolved = state.solved.every(val => val === true);
+        if (allSolved) {
+            setTimeout(() => {
+                document.getElementById('message-board').style.display = 'block';
+            }, 500);
+        }
+    }
+
+    // 7. CÁC NÚT ĐIỀU KHIỂN BÊN TRÊN
+    document.getElementById('btn-check').addEventListener('click', function() {
+        const solvedCount = state.solved.filter(v => v).length;
+        if (solvedCount === 12) {
+            document.getElementById('message-board').style.display = 'block';
+        } else {
+            alert(`Bạn mới giải mã được ${solvedCount}/12 câu. Hãy tiếp tục nhé!`);
+        }
+    });
+
+    document.getElementById('btn-retry-wrong').addEventListener('click', function() {
+        optionButtonsMap.forEach((btns, qIndex) => {
+            if (!state.solved[qIndex]) {
+                btns.forEach(b => {
+                    b.classList.remove('wrong');
+                });
+            }
+        });
+    });
+
+    document.getElementById('btn-retry-all').addEventListener('click', function() {
+        state.solved.fill(false);
+        // Reset buttons
+        optionButtonsMap.forEach(btns => {
+            btns.forEach(b => {
+                b.classList.remove('wrong', 'correct');
+                b.disabled = false;
+            });
+        });
+        // Reset matrix colors
+        cellElements.forEach(cell => {
+            cell.style.backgroundColor = '';
+            cell.style.color = '';
+        });
+        document.getElementById('message-board').style.display = 'none';
+    });
+
+    document.getElementById('btn-pdf').addEventListener('click', function() {
+        window.print();
+    });
+
+    document.getElementById('btn-close-msg').addEventListener('click', function() {
+        document.getElementById('message-board').style.display = 'none';
+    });
+});
+</script>
+
+</body>
+</html>
 
 
